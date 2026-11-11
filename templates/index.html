@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Simulador de Cookie Clicker</title>
+    <style>
+        body { 
+            font-family: 'Segoe UI', Arial, sans-serif; 
+            background: #121212; 
+            color: #fff; 
+            margin: 0; 
+            padding: 20px; 
+        }
+        .container { 
+            max-width: 1000px; 
+            margin: 0 auto; 
+        }
+        .header { 
+            text-align: center; 
+            background: #1e1e1e; 
+            padding: 20px; 
+            border-radius: 12px; 
+            border: 1px solid #333; 
+            margin-bottom: 20px; 
+        }
+        .header h1 { margin: 0 0 10px 0; font-size: 2em; }
+        .header h2 { margin: 0; color: #f59e0b; }
+        
+        .grid { 
+            display: grid; 
+            grid-template-columns: 1fr 1fr; 
+            gap: 20px; 
+            margin-bottom: 20px;
+        }
+        .panel { 
+            background: #1e1e1e; 
+            padding: 15px; 
+            border-radius: 10px; 
+            border: 1px solid #333; 
+            max-height: 500px; 
+            overflow-y: auto; 
+        }
+        .card { 
+            background: #2a2a2a; 
+            padding: 12px; 
+            margin-bottom: 10px; 
+            border-radius: 8px; 
+            border: 1px solid #444; 
+            display: flex; 
+            justify-content: space-between; 
+            align-items: center; 
+        }
+        .card-info { font-size: 0.9em; }
+        .card-info h4 { margin: 0 0 5px 0; font-size: 1.1em; color: #3b82f6; }
+        
+        .btn-group { display: flex; flex-direction: column; gap: 6px; }
+        .btn-comprar { 
+            background: #10b981; color: white; border: none; padding: 8px 12px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; 
+        }
+        .btn-comprar:hover { background: #059669; }
+        .btn-mejora { 
+            background: #8b5cf6; color: white; border: none; padding: 8px 12px; 
+            border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 0.85em; 
+        }
+        .btn-mejora:hover { background: #7c3aed; }
+        .badge-comprada { background: #374151; color: #9ca3af; padding: 4px 8px; border-radius: 4px; font-size: 0.8em; }
+        .trp-highlight { color: #f59e0b; font-weight: bold; }
+
+        /* Estilos de la tabla de recomendaciones */
+        .tabla-container {
+            background: #1e1e1e;
+            padding: 20px;
+            border-radius: 10px;
+            border: 1px solid #333;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #333;
+        }
+        th { background: #2a2a2a; color: #f59e0b; }
+        tr:hover { background: #262626; }
+        .top-1 { background: rgba(245, 158, 11, 0.15); font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="header">
+        <h1>Simulador Cookie Clicker</h1>
+        <h2>CpS Total: <span id="cps-total">0</span></h2>
+    </div>
+
+    <div class="grid">
+        <!-- Panel de Edificios -->
+        <div class="panel">
+            <h3>Edificios</h3>
+            <div id="contenedor-edificios"></div>
+        </div>
+
+        <!-- Panel de Mejoras de Galletas -->
+        <div class="panel">
+            <h3>Mejoras de Galletas (+%)</h3>
+            <div id="contenedor-galletas"></div>
+        </div>
+    </div>
+
+    <!-- Tabla de mejores opciones según TRP -->
+    <div class="tabla-container">
+        <h3>Top Compras Más Rentables (Menor TRP)</h3>
+        <table>
+            <thead>
+                <tr>
+                    <th># Posición</th>
+                    <th>Edificio</th>
+                    <th>Nivel Actual</th>
+                    <th>Costo Próximo</th>
+                    <th>TRP (Segundos en pagarse)</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tabla-recomendaciones">
+                <!-- Se llena dinámicamente -->
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+    async function actualizarEstado() {
+        try {
+            const res = await fetch('/api/estado');
+            const data = await res.json();
+
+            // 1. Mostrar CpS Total
+            document.getElementById('cps-total').innerText = data.cps_total.toLocaleString(undefined, {maximumFractionDigits: 1});
+
+            // 2. Renderizar lista de Edificios
+            const divEdificios = document.getElementById('contenedor-edificios');
+            divEdificios.innerHTML = '';
+            data.edificios.forEach(e => {
+                const trpTexto = (e.trp === null || e.trp === 0 || e.trp === Infinity)
+                    ? 'N/A' 
+                    : e.trp.toLocaleString(undefined, {maximumFractionDigits: 1}) + ' seg';
+
+                divEdificios.innerHTML += `
+                    <div class="card">
+                        <div class="card-info">
+                            <h4>${e.nombre} <small style="color:#aaa">(Nivel ${e.nivel})</small></h4>
+                            <div>Precio: <b>${e.precio.toLocaleString(undefined, {maximumFractionDigits: 0})}</b></div>
+                            <div>CpS Indiv: ${e.cps_ind.toLocaleString(undefined, {maximumFractionDigits: 1})}</div>
+                            <div>Prod: ${e.produccion.toLocaleString(undefined, {maximumFractionDigits: 1})} CpS</div>
+                            <div>TRP: <span class="trp-highlight">${trpTexto}</span></div>
+                        </div>
+                        <div class="btn-group">
+                            <button class="btn-comprar" onclick="comprarEdificio('${e.nombre}')">Comprar +1</button>
+                            <button class="btn-mejora" onclick="mejoraDoble('${e.nombre}')">Mejora 2x</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            // 3. Renderizar lista de Galletas
+            const divGalletas = document.getElementById('contenedor-galletas');
+            divGalletas.innerHTML = '';
+            data.galletas.forEach(g => {
+                const btnHtml = g.comprada 
+                    ? `<span class="badge-comprada">Comprada</span>`
+                    : `<button class="btn-comprar" onclick="comprarGalleta('${g.nombre}')">Comprar</button>`;
+
+                const trpTexto = (g.trp === null || g.trp === Infinity) 
+                    ? 'N/A' 
+                    : g.trp.toLocaleString(undefined, {maximumFractionDigits: 1}) + ' seg';
+
+                divGalletas.innerHTML += `
+                    <div class="card">
+                        <div class="card-info">
+                            <h4>${g.nombre} (+${(g.porcentaje * 100).toFixed(0)}%)</h4>
+                            <div>Precio: <b>${g.precio.toLocaleString()}</b></div>
+                            <div>TRP: <span class="trp-highlight">${trpTexto}</span></div>
+                        </div>
+                        ${btnHtml}
+                    </div>
+                `;
+            });
+
+            // 4. Renderizar Tabla de Recomendaciones (Top por TRP)
+            const tabla = document.getElementById('tabla-recomendaciones');
+            tabla.innerHTML = '';
+            
+            // Ordenamos todos los edificios por su TRP actual de menor a mayor
+            const edificiosOrdenados = [...data.edificios].sort((a, b) => a.trp - b.trp);
+
+            edificiosOrdenados.forEach((e, idx) => {
+                const esTop1 = idx === 0 ? 'top-1' : '';
+                tabla.innerHTML += `
+                    <tr class="${esTop1}">
+                        <td>#${idx + 1}</td>
+                        <td><b>${e.nombre}</b></td>
+                        <td>${e.nivel}</td>
+                        <td>${e.precio.toLocaleString(undefined, {maximumFractionDigits: 0})}</td>
+                        <td><span class="trp-highlight">${e.trp.toLocaleString(undefined, {maximumFractionDigits: 1})}</span> seg</td>
+                        <td>
+                            <button class="btn-comprar" onclick="comprarEdificio('${e.nombre}')">Comprar +1</button>
+                        </td>
+                    </tr>
+                `;
+            });
+
+        } catch (err) {
+            console.error("Error al actualizar el estado:", err);
+        }
+    }
+
+    async function comprarEdificio(nombre) {
+        await fetch('/api/comprar_edificio', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre: nombre })
+        });
+        actualizarEstado();
+    }
+
+    async function mejoraDoble(nombre) {
+        await fetch('/api/mejora_doble', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre: nombre })
+        });
+        actualizarEstado();
+    }
+
+    async function comprarGalleta(nombre) {
+        await fetch('/api/comprar_galleta', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ nombre: nombre })
+        });
+        actualizarEstado();
+    }
+
+    actualizarEstado();
+</script>
+
+</body>
+</html>
